@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart Price Tracker</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+        }
+
+        .form-box {
+            margin-top: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        input {
+            padding: 12px;
+            font-size: 16px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            padding: 12px;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background-color: #3498db;
+            color: white;
+        }
+
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        button:hover:not(:disabled) {
+            background-color: #2980b9;
+        }
+
+        .hint {
+            font-size: 13px;
+        }
+
+        .message {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .error {
+            background: #fdecea;
+            color: #c62828;
+        }
+
+        .price-box {
+            margin-top: 15px;
+            font-size: 18px;
+            color: #1e88e5;
+            font-weight: bold;
+        }
+
+        #loading {
+            display: none;
+            margin-top: 15px;
+            color: #555;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 30px;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #34495e;
+            color: white;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        .url-cell {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📉 Smart E-Commerce Price Tracker</h1>
+
+    <!-- FORM -->
+    <form method="post" class="form-box" onsubmit="handleSubmit()">
+        <input
+            type="text"
+            id="productUrl"
+            name="product_url"
+            placeholder="Paste Flipkart Product URL"
+            required
+            oninput="validateURL()"
+        >
+        <div id="urlHint" class="hint"></div>
+
+        <input
+            type="email"
+            name="email"
+            placeholder="Enter your email"
+            required
+        >
+
+        <button type="submit" id="submitBtn">Track Price</button>
+    </form>
+
+    <!-- LOADING -->
+    <div id="loading">⏳ Fetching price… please wait</div>
+
+    <!-- MESSAGES -->
+    {% if message %}
+        <div class="message success" id="successMsg">
+            {{ message }}
+        </div>
+    {% endif %}
+
+    {% if error %}
+        <div class="message error">
+            {{ error }}
+        </div>
+    {% endif %}
+
+    {% if price %}
+        <div class="price-box">
+            Current Price: {{ price }}
+        </div>
+    {% endif %}
+
+    <!-- SEARCH -->
+    {% if submitted and products %}
+        <input
+            type="text"
+            id="searchInput"
+            placeholder="Search your tracked products..."
+            style="margin-top:20px; padding:10px; width:100%;"
+            onkeyup="filterTable()"
+        >
+
+        <!-- TABLE -->
+        <h2 style="margin-top:20px;">📊 Your Tracked Products</h2>
+
+        <table id="productsTable">
+            <tr>
+                <th>Product URL</th>
+                <th>Last Price</th>
+                <th>Last Checked</th>
+            </tr>
+
+            {% for product in products %}
+            <tr>
+                <td class="url-cell">{{ product[0] }}</td>
+                <td>₹{{ product[1] }}</td>
+                <td>{{ product[2] }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    {% endif %}
+
+    <div class="footer">
+        Smart Price Tracking System • Built with FastAPI & Selenium
+    </div>
+</div>
+
+<!-- JAVASCRIPT -->
+<script>
+function handleSubmit() {
+    document.getElementById("loading").style.display = "block";
+    document.getElementById("submitBtn").disabled = true;
+}
+
+function validateURL() {
+    const url = document.getElementById("productUrl").value;
+    const hint = document.getElementById("urlHint");
+
+    if (url.includes("flipkart.com")) {
+        hint.textContent = "✅ Valid Flipkart URL";
+        hint.style.color = "green";
+    } else {
+        hint.textContent = "⚠️ Enter a valid Flipkart product URL";
+        hint.style.color = "red";
+    }
+}
+
+function filterTable() {
+    const input = document.getElementById("searchInput").value.toLowerCase();
+    const rows = document.querySelectorAll("#productsTable tr");
+
+    rows.forEach((row, index) => {
+        if (index === 0) return;
+        row.style.display = row.textContent.toLowerCase().includes(input)
+            ? ""
+            : "none";
+    });
+}
+
+// Auto-hide success message
+setTimeout(() => {
+    const msg = document.getElementById("successMsg");
+    if (msg) msg.style.display = "none";
+}, 5000);
+</script>
+
+</body>
+</html>
