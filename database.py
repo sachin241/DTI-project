@@ -1,15 +1,18 @@
 # database.py
+import os
 import sqlite3
 from contextlib import contextmanager
 from typing import List, Optional, Tuple
 
-DB_NAME = "prices.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_NAME = os.getenv("DB_NAME", "prices.db")
+DB_PATH = DB_NAME if os.path.isabs(DB_NAME) else os.path.join(BASE_DIR, DB_NAME)
 
 
 @contextmanager
 def get_db():
     """Context manager for safe database connections with auto-close."""
-    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     try:
         yield conn

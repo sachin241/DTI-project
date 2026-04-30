@@ -19,22 +19,25 @@ from scheduler import start_price_scheduler, stop_price_scheduler
 
 # ── App ────────────────────────────────────────────────────────────────────────
 app = FastAPI()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+APP_BASE_URL = os.getenv("APP_BASE_URL", "http://127.0.0.1:8000")
+GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_REDIRECT_URI  = os.getenv("GOOGLE_REDIRECT_URI", f"{APP_BASE_URL}/auth/google/callback")
+SESSION_HTTPS_ONLY   = os.getenv("SESSION_HTTPS_ONLY", "false").lower() in ("1", "true", "yes")
 
 app.add_middleware(
     SessionMiddleware,
     secret_key = os.getenv("SECRET_KEY", secrets.token_hex(32)),
     max_age    = 60 * 60 * 24 * 7,
     same_site  = "lax",
-    https_only = False,
+    https_only = SESSION_HTTPS_ONLY,
 )
 
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 LOGGED_IN_USERS: set = set()
-
-GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
-GOOGLE_REDIRECT_URI  = os.getenv("GOOGLE_REDIRECT_URI", "http://127.0.0.1:8000/auth/google/callback")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

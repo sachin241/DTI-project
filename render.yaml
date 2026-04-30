@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: price-tracker
+    env: docker
+    plan: starter
+    dockerfilePath: Dockerfile
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port ${PORT:-10000}
+    envVars:
+      - key: SECRET_KEY
+      - key: SENDER_EMAIL
+      - key: APP_PASSWORD
+      - key: APP_BASE_URL
+      - key: GOOGLE_CLIENT_ID
+      - key: GOOGLE_CLIENT_SECRET
+      - key: GOOGLE_REDIRECT_URI

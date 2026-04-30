@@ -4,8 +4,8 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-SENDER_EMAIL = os.getenv("SENDER_EMAIL", "")
-APP_PASSWORD  = os.getenv("APP_PASSWORD", "")
+SENDER_EMAIL = os.getenv("SENDER_EMAIL")
+APP_PASSWORD  = os.getenv("APP_PASSWORD")
 
 PLATFORM_COLORS = {
     "flipkart": "#2874F0",

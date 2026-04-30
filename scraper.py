@@ -3,6 +3,7 @@
 Multi-platform price scraper.
 Supports: Flipkart · Amazon India · Myntra · Snapdeal
 """
+import os
 import re
 import time
 from typing import Optional, Tuple
@@ -14,8 +15,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 
-
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────── ───────────
 
 def _make_driver() -> webdriver.Chrome:
     options = webdriver.ChromeOptions()
@@ -33,6 +33,11 @@ def _make_driver() -> webdriver.Chrome:
     )
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
+
+    chrome_bin = os.getenv("CHROME_BINARY")
+    if chrome_bin:
+        options.binary_location = chrome_bin
+
     return webdriver.Chrome(
         service=Service(ChromeDriverManager().install()),
         options=options
@@ -112,62 +117,211 @@ def _scrape_flipkart(driver, url: str) -> Tuple[Optional[str], Optional[int], Op
     return price_text, _parse_price(price_text), title
 
 
+
+
+
 def _scrape_amazon(driver, url: str) -> Tuple[Optional[str], Optional[int], Optional[str]]:
     driver.get(url)
-    time.sleep(2)
+    time.sleep(3)
 
-    price_text = _try_selectors(driver, [
-        "span.a-price-whole",
-        "span#priceblock_ourprice",
-        "span#priceblock_dealprice",
-        "span.apexPriceToPay span.a-offscreen",
-        "span#price_inside_buybox",
-        "span.a-color-price",
-    ])
-    if price_text:
-        price_text = "₹" + price_text.replace(",", "").strip(".") if "₹" not in price_text else price_text
+    price_text = None
 
-    title = _extract_title(driver, [
+    # ✅ CORRECT selectors (ONLY use a-offscreen)
+    selectors = [
+        "span#priceToPay span.a-offscreen",  # best
+        "#corePriceDisplay_desktop_feature_div span.a-price span.a-offscreen",
+        "span.a-price span.a-offscreen",  # fallback
+    ]
+
+    for selector in selectors:
+        try:
+            el = driver.find_element(By.CSS_SELECTOR, selector)
+            text = el.text.strip()
+
+            if text and "₹" in text:
+                price_text = text
+                break
+        except:
+            continue
+
+    # ❌ If still not found → fallback (rare case)
+    if not price_text:
+        try:
+            elements = driver.find_elements(By.XPATH, "//span[contains(@class,'a-offscreen')]")
+            values = []
+
+            for el in elements:
+                txt = el.text.strip()
+
+                if "₹" not in txt:
+                    continue
+
+                try:
+                    val = int(txt.replace("₹", "").replace(",", "").strip())
+                    if val > 5000:  # filter junk (EMI etc.)
+                        values.append(val)
+                except:
+                    continue
+
+            if values:
+                price_number = min(values)
+                price_text = f"₹{price_number:,}"
+
+        except:
+            pass
+
+    # ❌ If still nothing
+    if not price_text:
+        return None, None, None
+
+    # ✅ Clean parsing
+    try:
+        price_number = int(price_text.replace("₹", "").replace(",", "").strip())
+    except:
+        price_number = None
+
+    # ✅ Title extraction
+    title = None
+    for selector in [
         "span#productTitle",
         "h1.a-size-large",
-    ])
-    return price_text, _parse_price(price_text), title
+    ]:
+        try:
+            title_el = driver.find_element(By.CSS_SELECTOR, selector)
+            title = title_el.text.strip()
+            if title:
+                break
+        except:
+            continue
+
+    return price_text, price_number, title
+
 
 
 def _scrape_myntra(driver, url: str) -> Tuple[Optional[str], Optional[int], Optional[str]]:
     driver.get(url)
-    time.sleep(3)
+    time.sleep(4)  # Myntra needs more load time
 
-    price_text = _try_selectors(driver, [
-        "span.pdp-price strong",
-        "span.pdp-discounted-price strong",
-        "div.pdp-price",
-        "span.pdp-price",
-    ]) or _fallback_rupee_scan(driver)
+    price_text = None
 
-    title = _extract_title(driver, [
+    selectors = [
+        "span.pdp-price strong",                 # main
+        "span.pdp-discounted-price strong",      # discounted
+        "span.pdp-price",                        # fallback
+    ]
+
+    for selector in selectors:
+        try:
+            el = driver.find_element(By.CSS_SELECTOR, selector)
+            text = el.text.strip()
+
+            if text and "₹" in text:
+                price_text = text
+                break
+        except:
+            continue
+
+    # 🔥 fallback (important for dynamic cases)
+    if not price_text:
+        try:
+            elements = driver.find_elements(By.XPATH, "//*[contains(text(),'₹')]")
+            for el in elements:
+                txt = el.text.strip()
+                if "₹" in txt:
+                    val = _parse_price(txt)
+                    if val and val > 500:  # filter junk
+                        price_text = f"₹{val:,}"
+                        break
+        except:
+            pass
+
+    if not price_text:
+        return None, None, None
+
+    price_number = _parse_price(price_text)
+
+    # ✅ Title
+    title = None
+    for selector in [
         "h1.pdp-title",
         "h1.pdp-name",
         "div.pdp-name",
-    ])
-    return price_text, _parse_price(price_text), title
+    ]:
+        try:
+            el = driver.find_element(By.CSS_SELECTOR, selector)
+            title = el.text.strip()
+            if title:
+                break
+        except:
+            continue
+
+    return price_text, price_number, title
 
 
 def _scrape_snapdeal(driver, url: str) -> Tuple[Optional[str], Optional[int], Optional[str]]:
     driver.get(url)
-    time.sleep(2)
+    time.sleep(3)
 
-    price_text = _try_selectors(driver, [
-        "span#selling-price-id",
-        "div.payBlkBig",
-        "span.lfloat.product-price",
-    ]) or _fallback_rupee_scan(driver)
+    price_text = None
 
-    title = _extract_title(driver, [
+    selectors = [
+        "span#selling-price-id",        # main
+        "span.payBlkBig",               # correct class
+        "span.lfloat.product-price",    # fallback
+    ]
+
+    for selector in selectors:
+        try:
+            el = driver.find_element(By.CSS_SELECTOR, selector)
+            text = el.text.strip()
+
+            if text and "₹" in text:
+                price_text = text
+                break
+        except:
+            continue
+
+    # 🔥 fallback (very important)
+    if not price_text:
+        try:
+            elements = driver.find_elements(By.XPATH, "//*[contains(text(),'₹')]")
+            values = []
+
+            for el in elements:
+                txt = el.text.strip()
+                if "₹" not in txt:
+                    continue
+
+                val = _parse_price(txt)
+                if val and val > 500:
+                    values.append(val)
+
+            if values:
+                price_number = min(values)
+                price_text = f"₹{price_number:,}"
+        except:
+            pass
+
+    if not price_text:
+        return None, None, None
+
+    price_number = _parse_price(price_text)
+
+    # ✅ Title
+    title = None
+    for selector in [
         "h1.pdp-e-i-head",
         "h1#pdpProductName",
-    ])
-    return price_text, _parse_price(price_text), title
+    ]:
+        try:
+            el = driver.find_element(By.CSS_SELECTOR, selector)
+            title = el.text.strip()
+            if title:
+                break
+        except:
+            continue
+
+    return price_text, price_number, title
 
 
 # ── Dispatcher ────────────────────────────────────────────────────────────────
